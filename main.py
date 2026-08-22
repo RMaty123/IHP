@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import json
+from add_clip import handle_add, format_clip_name, time_to_ffmpeg, normalize_time
 
 class IHP_Editor:
     def __init__(self):
@@ -11,7 +12,7 @@ class IHP_Editor:
         self.unsaved_changes = False
 
         self.commands_main = {
-            "add": "Přidá klip do projektu. Použití: add <cesta_k_souboru> [počáteční_čas]",
+            "add": "Přidá klip do projektu. Použití: add [cesta] [čas] (nebo jen add pro asistenta). Čas: hh:mm:ss:setiny.",
             "back": "Smaže poslední klip z časové osy.",
             "ls, rm, mv": "Propouští tyto systémové příkazy přímo do terminálu.",
             "write / wr": "Uloží aktuální projekt na disk.",
@@ -21,7 +22,7 @@ class IHP_Editor:
         }
 
         self.commands_clip = {
-            "cutout": "Nastaví koncový čas aktuálního klipu. Použití: cutout <koncový_čas>",
+            "cutout": "Nastaví koncový čas aktuálního klipu. Použití: cutout <koncový_čas (hh:mm:ss:setiny)>",
             "end": "Ukončí editaci klipu, uloží ho na časovou osu a vrátí se do hlavního menu.",
             "help": "Zobrazí nápovědu. Použití: help [příkaz]"
         }
@@ -66,10 +67,12 @@ class IHP_Editor:
             
             # Sestavení příkazu pro oříznutí konkrétního klipu
             ffmpeg_cmd = ["ffmpeg", "-y", "-i", clip["path"]]
-            if clip["in"] != "00:00:00":
-                ffmpeg_cmd.extend(["-ss", clip["in"]])
-            if clip["out"]:
-                ffmpeg_cmd.extend(["-to", clip["out"]])
+            clip_in = time_to_ffmpeg(clip.get("in", "00:00:00:00"))
+            if clip_in != "00:00:00":
+                ffmpeg_cmd.extend(["-ss", clip_in])
+            if clip.get("out"):
+                clip_out = time_to_ffmpeg(clip["out"])
+                ffmpeg_cmd.extend(["-to", clip_out])
                 
             # Přidáme parametry pro libx264 a potlačíme výstup (-loglevel error)
             ffmpeg_cmd.extend(["-c:v", "libx264", "-preset", "fast", "-loglevel", "error", temp_out])
@@ -114,11 +117,9 @@ class IHP_Editor:
         print("Zadejte 'help' pro seznam příkazů.")
 
         while True:
-            # Sestavení promptu
+            # Sestavení promptu - název klipu zkrácen na max. 12 znaků
             if self.current_clip:
-                short_name = os.path.basename(self.current_clip['path'])
-                if len(short_name) > 12:
-                    short_name = short_name[:9] + "..."
+                short_name = format_clip_name(self.current_clip['path'], max_len=12)
                 prompt = f"ihp ({short_name}) > "
             else:
                 prompt = "ihp > "
@@ -145,10 +146,11 @@ class IHP_Editor:
                     print("[OK] Klip přidán na časovou osu.")
                 elif cmd in ["cutout", "cut"]:
                     if not args:
-                        print("[CHYBA] Musíte zadat koncový čas. Příklad: cutout 00:05:00")
+                        print("[CHYBA] Musíte zadat koncový čas. Příklad: cutout 00:05:00:00")
                     else:
-                        self.current_clip['out'] = args[0]
-                        print(f"[OK] Konec klipu nastaven na {args[0]}")
+                        norm_out = normalize_time(args[0])
+                        self.current_clip['out'] = norm_out
+                        print(f"[OK] Konec klipu nastaven na {norm_out}")
                 elif cmd == "help":
                     self.cmd_help(args, self.commands_clip)
                 else:
@@ -157,21 +159,7 @@ class IHP_Editor:
 
             # 2. REŽIM HLAVNÍHO MENU
             if cmd == "add":
-                if not args:
-                    print("[CHYBA] Chybí cesta k souboru. Příklad: add video.mp4 00:01:00")
-                    continue
-                file_path = args[0]
-                start_time = args[1] if len(args) > 1 else "00:00:00"
-                
-                if not os.path.exists(file_path):
-                    print(f"[VAROVÁNÍ] Soubor '{file_path}' nebyl nalezen na disku!")
-                    
-                self.current_clip = {
-                    "path": file_path,
-                    "in": start_time,
-                    "out": None
-                }
-                print(f"[OK] Otevřen klip '{file_path}'. Nyní jste v režimu klipu.")
+                handle_add(self, args)
             
             elif cmd == "back":
                 if self.timeline:
@@ -217,3 +205,4 @@ if __name__ == "__main__":
         
     app = IHP_Editor()
     app.run()
+
