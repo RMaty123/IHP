@@ -98,15 +98,19 @@ class IHP_Editor:
             bar = "#" * (percent // 5) + "-" * (20 - (percent // 5))
             print(f"\r[RENDER] Progress: [{bar}] {percent}% (Hotovo {i+1}/{total_clips} klipů)", end="", flush=True)
             
+        valid_temp_files = [tmp for tmp in temp_files if os.path.exists(tmp) and os.path.getsize(tmp) > 0]
+        if not valid_temp_files:
+            print("\n\n[CHYBA] Žádný z klipů se nepodařilo vyrenderovat (soubory nebyly nalezeny nebo nebyly platným videem). Renderování přerušeno.")
+            return
+
         print("\n\n[RENDER] Spojuji klipy do finálního souboru...")
         
         # FÁZE 2: Bleskové spojení (concat demuxer) beze ztráty kvality (-c copy)
         concat_file = "ihp_concat_list.txt"
         try:
             with open(concat_file, 'w') as f:
-                for tmp in temp_files:
-                    if os.path.exists(tmp):
-                        f.write(f"file '{os.path.abspath(tmp)}'\n")
+                for tmp in valid_temp_files:
+                    f.write(f"file '{os.path.abspath(tmp)}'\n")
                     
             concat_cmd = ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_file, "-c", "copy", "-loglevel", "error", output_file]
             subprocess.run(concat_cmd, check=True)

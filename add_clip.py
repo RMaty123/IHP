@@ -36,11 +36,29 @@ def init_terminal_colors():
 
 init_terminal_colors()
 
-# Podporované přípony mediálních souborů
+# Podporované přípony mediálních (video a audio) souborů
 MEDIA_EXTENSIONS = {
     '.mp4', '.mkv', '.mov', '.avi', '.webm', '.flv', '.wmv', '.m4v', '.ts',
     '.mp3', '.wav', '.aac', '.flac', '.m4a', '.ogg', '.opus', '.wma'
 }
+
+def is_valid_media_file(file_path: str) -> tuple:
+    """
+    Pojistka proti ne-video a ne-audio formátům.
+    Ověřuje příponu a případně existenci streamu.
+    Vrací: (is_valid: bool, reason: str)
+    """
+    if not file_path:
+        return False, "Cesta nebyla zadána."
+        
+    ext = os.path.splitext(file_path)[1].lower()
+    if not ext:
+        return False, f"Soubor '{os.path.basename(file_path)}' nemá žádnou příponu."
+        
+    if ext not in MEDIA_EXTENSIONS:
+        return False, f"Přípona '{ext}' není podporovaný video/audio formát (podporovány jsou: {', '.join(sorted(MEDIA_EXTENSIONS)[:7])}...)."
+        
+    return True, "OK"
 
 def is_time_format(token: str) -> bool:
     """
@@ -421,7 +439,7 @@ def interactive_file_picker(start_dir: str = ".") -> str:
             items_list.append(('file', f_path, f))
             idx += 1
 
-        # Ostatní soubory (pokud nejsou mediální soubory)
+        # Ostatní soubory (pouze pokud nejsou nalezeny žádné mediální soubory)
         if len(media_files) == 0 and other_files:
             for f in other_files[:15]:
                 f_path = os.path.join(current_dir, f)
@@ -541,6 +559,7 @@ def handle_add(editor, args: list) -> bool:
     """
     Hlavní obslužná funkce pro příkaz 'add'.
     Přijímá pouze cestu (bez časových parametrů) nebo spustí asistenta s podporou Tabulátoru.
+    Ověřuje, zda je soubor platným video/audio formátem (pojistka proti ne-video formátům).
     
     Po výběru souboru zjistí jeho přesnou délku a vypíše ji ve formátu HH:MM:ss:setiny.
     """
@@ -556,7 +575,7 @@ def handle_add(editor, args: list) -> bool:
 
     file_path = file_path.strip('\'"')
     
-    # Kontrola existence
+    # 1. Kontrola existence
     if not os.path.exists(file_path):
         norm_path = os.path.normpath(file_path)
         if not os.path.exists(norm_path):
@@ -579,7 +598,20 @@ def handle_add(editor, args: list) -> bool:
                 print(f"{Colors.GRAY}[Příkaz 'add' zrušen]{Colors.RESET}")
                 return False
 
-    # Zjištění délky videa
+    # 2. Pojistka proti ne-video formátům (kontrola přípony a typu média)
+    is_valid, validation_reason = is_valid_media_file(file_path)
+    if not is_valid:
+        print(f"\n{Colors.RED}[VAROVÁNÍ] Soubor '{file_path}' není podporovaný video/audio formát!{Colors.RESET}")
+        print(f"{Colors.GRAY}           Důvod: {validation_reason}{Colors.RESET}")
+        try:
+            ans = input("Chcete tento soubor přesto přidat do projektu? (y/n) [n]: ").strip().lower()
+            if ans != 'y':
+                print(f"{Colors.GRAY}[Příkaz 'add' zrušen]{Colors.RESET}\n")
+                return False
+        except (KeyboardInterrupt, EOFError):
+            return False
+
+    # 3. Zjištění délky videa
     print(f"{Colors.GRAY}[INFO] Zjišťuji délku videa...{Colors.RESET}")
     duration = get_video_duration(file_path)
     default_out = duration if duration != "Neznámá" else None
