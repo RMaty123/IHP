@@ -2,7 +2,14 @@ import os
 import sys
 import subprocess
 import json
-from add_clip import handle_add, format_clip_name, time_to_ffmpeg, normalize_time
+from add_clip import (
+    handle_add,
+    format_clip_name,
+    time_to_ffmpeg,
+    normalize_time,
+    handle_clip_start,
+    handle_clip_stop
+)
 
 class IHP_Editor:
     def __init__(self):
@@ -149,26 +156,10 @@ class IHP_Editor:
                     print("\n[OK] Klip byl úspěšně přidán na časovou osu.\n")
 
                 elif cmd == "start":
-                    if not args:
-                        print("\n[CHYBA] Musíte zadat počáteční čas. Příklad: start 00:01:30:00\n")
-                    else:
-                        norm_in = normalize_time(args[0])
-                        self.current_clip['in'] = norm_in
-                        print()
-                        print(f"[OK] Začátek klipu nastaven na: {norm_in}")
-                        print(f"     Aktuální střih: {norm_in} -> {self.current_clip.get('out') or 'konec videa'}")
-                        print()
+                    handle_clip_start(self.current_clip, args)
 
                 elif cmd in ["stop", "cutout", "cut"]:
-                    if not args:
-                        print("\n[CHYBA] Musíte zadat koncový čas. Příklad: stop 00:05:00:00\n")
-                    else:
-                        norm_out = normalize_time(args[0])
-                        self.current_clip['out'] = norm_out
-                        print()
-                        print(f"[OK] Konec klipu nastaven na:   {norm_out}")
-                        print(f"     Aktuální střih: {self.current_clip.get('in', '00:00:00:00')} -> {norm_out}")
-                        print()
+                    handle_clip_stop(self.current_clip, args)
 
                 elif cmd == "info":
                     print()

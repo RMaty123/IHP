@@ -113,6 +113,22 @@ def seconds_to_time_str(seconds: float) -> str:
         s += 1
     return f"{h:02d}:{m:02d}:{s:02d}:{cs:02d}"
 
+def time_to_seconds(time_str: str) -> float:
+    """
+    Převede čas ve formátu hh:mm:ss:setiny na počet sekund (float).
+    Pokud je čas neplatný, vyvolá ValueError.
+    """
+    if not time_str or not is_time_format(time_str):
+        raise ValueError(f"Neplatný formát času: '{time_str}'")
+    
+    norm = normalize_time(time_str)
+    parts = norm.split(':')
+    h = int(parts[0])
+    m = int(parts[1])
+    s = int(parts[2])
+    cs = int(parts[3]) if len(parts) > 3 else 0
+    return h * 3600.0 + m * 60.0 + s + (cs / 100.0)
+
 def time_to_ffmpeg(time_str: str) -> str:
     """
     Převede čas ve formátu hh:mm:ss:setiny na formát akceptovaný FFmpeg (hh:mm:ss.setiny).
@@ -593,3 +609,105 @@ def handle_add(editor, args: list) -> bool:
     print(f"{Colors.GREEN}{'=' * 64}{Colors.RESET}")
     print()
     return True
+
+def handle_clip_start(clip: dict, args: list) -> bool:
+    """
+    Obslouží příkaz 'start' v režimu klipu s try-except a validací logiky časů.
+    Zabraňuje nastavení začátku na nebo za koncový čas.
+    """
+    try:
+        if not args:
+            print(f"\n{Colors.RED}[CHYBA] Musíte zadat počáteční čas. Příklad: start 00:01:30:00{Colors.RESET}\n")
+            return False
+            
+        time_arg = args[0]
+        if not is_time_format(time_arg):
+            print(f"\n{Colors.RED}[CHYBA] Neplatný formát času '{time_arg}'. Použijte formát hh:mm:ss:setiny (např. 00:01:20:00).{Colors.RESET}\n")
+            return False
+            
+        new_in_norm = normalize_time(time_arg)
+        new_in_sec = time_to_seconds(new_in_norm)
+        
+        # Kontrola proti existujícímu stop času
+        current_out = clip.get('out')
+        if current_out and current_out != "Neznámá" and is_time_format(current_out):
+            out_sec = time_to_seconds(current_out)
+            if new_in_sec >= out_sec:
+                print(f"\n{Colors.RED}[CHYBA] Čas začátku ({new_in_norm}) nemůže být větší ani roven času konce ({current_out})!{Colors.RESET}")
+                print(f"{Colors.GRAY}       (Klip by skončil dříve nebo ve stejný okamžik než začne){Colors.RESET}\n")
+                return False
+                
+        # Kontrola proti celkové délce videa
+        duration = clip.get('duration')
+        if duration and duration != "Neznámá" and is_time_format(duration):
+            dur_sec = time_to_seconds(duration)
+            if new_in_sec > dur_sec:
+                print(f"\n{Colors.YELLOW}[VAROVÁNÍ] Zadaný čas začátku ({new_in_norm}) přesahuje celkovou délku videa ({duration})!{Colors.RESET}")
+                try:
+                    ans = input("Chcete přesto tento čas nastavit? (y/n): ").strip().lower()
+                    if ans != 'y':
+                        print(f"{Colors.GRAY}[Příkaz start zrušen]{Colors.RESET}\n")
+                        return False
+                except (KeyboardInterrupt, EOFError):
+                    return False
+
+        clip['in'] = new_in_norm
+        print()
+        print(f"{Colors.GREEN}[OK] Začátek klipu nastaven na: {new_in_norm}{Colors.RESET}")
+        print(f"     Aktuální střih: {Colors.WHITE}{new_in_norm} -> {clip.get('out') or 'konec videa'}{Colors.RESET}")
+        print()
+        return True
+    except Exception as e:
+        print(f"\n{Colors.RED}[CHYBA při nastavování začátku klipu]: {e}{Colors.RESET}\n")
+        return False
+
+def handle_clip_stop(clip: dict, args: list) -> bool:
+    """
+    Obslouží příkaz 'stop' / 'cutout' v režimu klipu s try-except a validací logiky časů.
+    Zabraňuje nastavení konce na nebo před počáteční čas.
+    """
+    try:
+        if not args:
+            print(f"\n{Colors.RED}[CHYBA] Musíte zadat koncový čas. Příklad: stop 00:05:00:00{Colors.RESET}\n")
+            return False
+            
+        time_arg = args[0]
+        if not is_time_format(time_arg):
+            print(f"\n{Colors.RED}[CHYBA] Neplatný formát času '{time_arg}'. Použijte formát hh:mm:ss:setiny (např. 00:05:00:00).{Colors.RESET}\n")
+            return False
+            
+        new_out_norm = normalize_time(time_arg)
+        new_out_sec = time_to_seconds(new_out_norm)
+        
+        # Kontrola proti času začátku (in)
+        current_in = clip.get('in', '00:00:00:00')
+        if current_in and is_time_format(current_in):
+            in_sec = time_to_seconds(current_in)
+            if new_out_sec <= in_sec:
+                print(f"\n{Colors.RED}[CHYBA] Čas konce ({new_out_norm}) nemůže být menší ani roven času začátku ({current_in})!{Colors.RESET}")
+                print(f"{Colors.GRAY}       (Klip by skončil dříve nebo ve stejný okamžik než začne){Colors.RESET}\n")
+                return False
+                
+        # Kontrola proti celkové délce videa
+        duration = clip.get('duration')
+        if duration and duration != "Neznámá" and is_time_format(duration):
+            dur_sec = time_to_seconds(duration)
+            if new_out_sec > dur_sec:
+                print(f"\n{Colors.YELLOW}[VAROVÁNÍ] Zadaný čas konce ({new_out_norm}) přesahuje celkovou délku videa ({duration})!{Colors.RESET}")
+                try:
+                    ans = input("Chcete přesto tento čas nastavit? (y/n): ").strip().lower()
+                    if ans != 'y':
+                        print(f"{Colors.GRAY}[Příkaz stop zrušen]{Colors.RESET}\n")
+                        return False
+                except (KeyboardInterrupt, EOFError):
+                    return False
+
+        clip['out'] = new_out_norm
+        print()
+        print(f"{Colors.GREEN}[OK] Konec klipu nastaven na:   {new_out_norm}{Colors.RESET}")
+        print(f"     Aktuální střih: {Colors.WHITE}{clip.get('in', '00:00:00:00')} -> {new_out_norm}{Colors.RESET}")
+        print()
+        return True
+    except Exception as e:
+        print(f"\n{Colors.RED}[CHYBA při nastavování konce klipu]: {e}{Colors.RESET}\n")
+        return False
