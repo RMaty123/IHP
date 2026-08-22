@@ -407,7 +407,6 @@ def interactive_file_picker(start_dir: str = ".") -> str:
 
         # Ostatní soubory (pokud nejsou mediální soubory)
         if len(media_files) == 0 and other_files:
-            print(f"  {Colors.GRAY}--- Ostatní soubory ---{Colors.RESET}")
             for f in other_files[:15]:
                 f_path = os.path.join(current_dir, f)
                 print(f"  {Colors.WHITE}[{idx:>2}] [SOUBOR] {f}{Colors.RESET}")
