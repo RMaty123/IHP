@@ -8,8 +8,17 @@ from add_clip import (
     time_to_ffmpeg,
     normalize_time,
     handle_clip_start,
-    handle_clip_stop
+    handle_clip_stop,
+    Colors
 )
+
+BANNER = rf"""{Colors.CYAN}{Colors.BOLD}
+  ___ _   _ ____  
+ |_ _| | | |  _ \ 
+  | || |_| | |_) |
+  | ||  _  |  __/ 
+ |___|_| |_|_|    
+{Colors.RESET}"""
 
 class IHP_Editor:
     def __init__(self):
@@ -126,8 +135,7 @@ class IHP_Editor:
                     os.remove(tmp)
 
     def run(self):
-        print("Welcome to IHP (I Hate Premiere) - The CLI Video Editor")
-        print("Type 'help' for a list of commands.")
+        print(BANNER)
 
         while True:
             # Build prompt - clip name truncated to max 12 characters
