@@ -30,7 +30,6 @@ class IHP_Editor:
         self.commands_main = {
             "add": "Add a clip to the project. Usage: add [path] (or 'add' for interactive browser with [Tab]).",
             "back": "Remove the last clip from the timeline.",
-            "ls, rm, mv": "Pass these system commands directly to the terminal.",
             "write / wr": "Save the current project to disk.",
             "render": "Render the project using FFmpeg. Usage: render <output.mp4>",
             "help": "Show help. Usage: help [command]",
@@ -199,13 +198,6 @@ class IHP_Editor:
                     print(f"[OK] Last clip ({removed['path']}) was removed from the timeline.")
                 else:
                     print("[INFO] Timeline is empty, nothing to delete.")
-
-            # Pass file management commands directly to system
-            elif cmd in ["ls", "rm", "mv"]:
-                try:
-                    subprocess.run([cmd] + args)
-                except Exception as e:
-                    print(f"[ERROR] Could not execute command '{cmd}': {e}")
 
             elif cmd in ["write", "wr"]:
                 self.cmd_write()
