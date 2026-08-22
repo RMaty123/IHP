@@ -12,7 +12,7 @@ class IHP_Editor:
         self.unsaved_changes = False
 
         self.commands_main = {
-            "add": "Přidá klip do projektu. Použití: add [cesta] [čas] (nebo jen add pro asistenta). Čas: hh:mm:ss:setiny.",
+            "add": "Přidá klip do projektu. Použití: add [cesta] (nebo jen add pro asistenta s [Tab]).",
             "back": "Smaže poslední klip z časové osy.",
             "ls, rm, mv": "Propouští tyto systémové příkazy přímo do terminálu.",
             "write / wr": "Uloží aktuální projekt na disk.",
@@ -22,7 +22,10 @@ class IHP_Editor:
         }
 
         self.commands_clip = {
-            "cutout": "Nastaví koncový čas aktuálního klipu. Použití: cutout <koncový_čas (hh:mm:ss:setiny)>",
+            "start": "Nastaví počáteční čas klipu. Použití: start <čas (hh:mm:ss:setiny)>",
+            "stop": "Nastaví koncový čas klipu. Použití: stop <čas (hh:mm:ss:setiny)>",
+            "cutout": "Alias pro příkaz stop.",
+            "info": "Zobrazí podrobné informace o klipu, délce a nastaveném střihu.",
             "end": "Ukončí editaci klipu, uloží ho na časovou osu a vrátí se do hlavního menu.",
             "help": "Zobrazí nápovědu. Použití: help [příkaz]"
         }
@@ -143,18 +146,44 @@ class IHP_Editor:
                     self.timeline.append(self.current_clip)
                     self.current_clip = None
                     self.unsaved_changes = True
-                    print("[OK] Klip přidán na časovou osu.")
-                elif cmd in ["cutout", "cut"]:
+                    print("\n[OK] Klip byl úspěšně přidán na časovou osu.\n")
+
+                elif cmd == "start":
                     if not args:
-                        print("[CHYBA] Musíte zadat koncový čas. Příklad: cutout 00:05:00:00")
+                        print("\n[CHYBA] Musíte zadat počáteční čas. Příklad: start 00:01:30:00\n")
+                    else:
+                        norm_in = normalize_time(args[0])
+                        self.current_clip['in'] = norm_in
+                        print()
+                        print(f"[OK] Začátek klipu nastaven na: {norm_in}")
+                        print(f"     Aktuální střih: {norm_in} -> {self.current_clip.get('out') or 'konec videa'}")
+                        print()
+
+                elif cmd in ["stop", "cutout", "cut"]:
+                    if not args:
+                        print("\n[CHYBA] Musíte zadat koncový čas. Příklad: stop 00:05:00:00\n")
                     else:
                         norm_out = normalize_time(args[0])
                         self.current_clip['out'] = norm_out
-                        print(f"[OK] Konec klipu nastaven na {norm_out}")
+                        print()
+                        print(f"[OK] Konec klipu nastaven na:   {norm_out}")
+                        print(f"     Aktuální střih: {self.current_clip.get('in', '00:00:00:00')} -> {norm_out}")
+                        print()
+
+                elif cmd == "info":
+                    print()
+                    print("-" * 50)
+                    print(f"  Soubor:  {self.current_clip['path']}")
+                    print(f"  Délka:   {self.current_clip.get('duration', 'Neznámá')}")
+                    print(f"  Začátek: {self.current_clip.get('in', '00:00:00:00')}")
+                    print(f"  Konec:   {self.current_clip.get('out') or 'Konec videa'}")
+                    print("-" * 50)
+                    print()
+
                 elif cmd == "help":
                     self.cmd_help(args, self.commands_clip)
                 else:
-                    print(f"Neznámý příkaz v režimu klipu. Zadejte 'help' nebo 'end' pro návrat.")
+                    print(f"\nNeznámý příkaz v režimu klipu. Zadejte 'start <čas>', 'stop <čas>', 'end' nebo 'help'.\n")
                 continue
 
             # 2. REŽIM HLAVNÍHO MENU
@@ -205,4 +234,5 @@ if __name__ == "__main__":
         
     app = IHP_Editor()
     app.run()
+
 
